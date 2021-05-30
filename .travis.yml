@@ -23,8 +23,8 @@ cache:
  - apt
 
 install:
-  - wget https://dl.influxdata.com/influxdb/releases/influxdb-1.2.4_linux_amd64.tar.gz
-  - tar xvfz influxdb-1.2.4_linux_amd64.tar.gz
+  - wget https://dl.influxdata.com/influxdb/releases/influxdb-1.8.3_linux_amd64.tar.gz
+  - tar xvfz influxdb-1.8.3_linux_amd64.tar.gz
 
 script:
   - cd ${TRAVIS_BUILD_DIR}
