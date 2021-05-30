@@ -87,9 +87,53 @@ namespace influxdb {
                 return *this;
             }
 
+            template<
+                class V,
+                typename std::enable_if<
+                    std::is_integral<V>::value
+                >::type* = nullptr
+            >
+                key_value_pairs& add_unsafe(std::string const& key, V const& value) {
+                add_comma_if_necessary();
+
+                res << key << "=" << value << "i";
+
+                return *this;
+            }
+
+            template<
+                class V,
+                typename std::enable_if<
+                std::is_floating_point<V>::value
+                >::type* = nullptr
+            >
+                key_value_pairs& add_unsafe(std::string const& key, V const& value) {
+                add_comma_if_necessary();
+
+                res << key << "=" << value;
+
+                return *this;
+            }
+
+            key_value_pairs& add_unsafe(std::string const& key, std::string const& value) {
+                add_comma_if_necessary();
+
+                res << key << "=\"" << value << "\"";
+
+                return *this;
+            }
+
             key_value_pairs& add_no_quotes(std::string const& key, std::string const& value) {
                 ::influxdb::utility::throw_on_invalid_identifier(key);
 
+                add_comma_if_necessary();
+
+                res << key << "=" << value << "";
+
+                return *this;
+            }
+
+            key_value_pairs& add_no_quotes_unsafe(std::string const& key, std::string const& value) {
                 add_comma_if_necessary();
 
                 res << key << "=" << value << "";
