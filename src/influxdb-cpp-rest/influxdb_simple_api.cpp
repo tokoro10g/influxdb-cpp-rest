@@ -53,3 +53,8 @@ void influxdb::api::simple_db::with_authentication(std::string const& username, 
 {
     pimpl->db.with_authentication(username, password);
 }
+
+void influxdb::api::simple_db::with_retention_policy(std::string const& retention_policy)
+{
+    pimpl->db.with_retention_policy(retention_policy);
+}

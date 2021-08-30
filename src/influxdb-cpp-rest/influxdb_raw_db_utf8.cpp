@@ -69,3 +69,8 @@ void influxdb::raw::db_utf8::with_authentication(std::string const& username, st
 {
     pimpl->db_utf16.with_authentication(username, password);
 }
+
+void influxdb::raw::db_utf8::with_retention_policy(std::string const& retention_policy)
+{
+    pimpl->db_utf16.with_retention_policy(retention_policy);
+}

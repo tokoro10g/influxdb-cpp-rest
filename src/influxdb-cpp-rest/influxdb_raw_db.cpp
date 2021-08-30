@@ -29,11 +29,21 @@ namespace {
             std::string const& lines,
             std::string const& username,
             std::string const& password,
+            std::string const& retention_policy = "",
             web::http::method const& m = methods::POST
     ) {
         http_request request;
 
-        request.set_request_uri(uri_with_db);
+        if (retention_policy.empty())
+        {
+            request.set_request_uri(uri_with_db);
+        }
+        else
+        {
+            uri_builder builder(uri_with_db);
+            builder.append_query("rp", retention_policy);
+            request.set_request_uri(builder.to_uri());
+        }
         request.set_method(m);
 
         if (!username.empty()) {
@@ -73,7 +83,7 @@ void influxdb::raw::db::post(string_t const & query)
 
     // synchronous for now
     auto response = client.request(
-        request_from(builder.to_string(), "", username, password)
+        request_from(builder.to_string(), "", username, password, retention_policy)
     );
 
     try {
@@ -94,7 +104,7 @@ string_t influxdb::raw::db::get(string_t const & query)
 
     // synchronous for now
     auto response = client.request(
-        request_from(builder.to_string(), "", username, password)
+        request_from(builder.to_string(), "", username, password, retention_policy)
     );
 
     try {
@@ -115,7 +125,7 @@ string_t influxdb::raw::db::get(string_t const & query)
 
 void influxdb::raw::db::insert(std::string const & lines)
 {
-    auto response = client.request(request_from(uri_with_db, lines, username, password));
+    auto response = client.request(request_from(uri_with_db, lines, username, password, retention_policy));
 
     try {
         response.wait();
@@ -137,4 +147,9 @@ void influxdb::raw::db::with_authentication(std::string const& username, std::st
 {
     this->username = username;
     this->password = password;
+}
+
+void influxdb::raw::db::with_retention_policy(std::string const& retention_policy)
+{
+    this->retention_policy = retention_policy;
 }

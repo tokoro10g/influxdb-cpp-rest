@@ -20,6 +20,7 @@ namespace influxdb {
 
             std::string username;
             std::string password;
+            std::string retention_policy;
 
         public:
             db(string_t const& url, string_t const& name);
@@ -38,6 +39,9 @@ namespace influxdb {
 
             /// set username & password for basic authentication
             void with_authentication(std::string const& username, std::string const& password);
+
+            /// set retention policy
+            void with_retention_policy(std::string const& retention_policy);
         };
     }
 }
