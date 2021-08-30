@@ -29,6 +29,7 @@ namespace influxdb {
             void drop();
             void insert(influxdb::api::line const& lines);
             void with_authentication(std::string const& username, std::string const& password);
+            void with_retention_policy(std::string const& retention_policy);
         };
     }
 
