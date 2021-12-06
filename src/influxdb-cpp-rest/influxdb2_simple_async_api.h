@@ -30,6 +30,7 @@ class simple_db : public influxdb::async_api::simple_db
  public:
   simple_db(std::string const& url, std::string const& org, std::string const& bucket);
   simple_db(std::string const& url, std::string const& org, std::string const& bucket,
+            std::string const& token,
             const int duration_seconds, const int shard_duration_seconds,
             const int window_max_lines, const int window_max_ms);
   ~simple_db();

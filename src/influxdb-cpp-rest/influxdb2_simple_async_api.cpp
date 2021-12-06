@@ -25,6 +25,7 @@ struct simple_db::impl
   uri uri_with_db;
   std::string org;
   std::string bucket;
+  std::string token;
   std::atomic<bool> started;
   rxcpp::subscription listener;
   rxcpp::subjects::subject<influxdb::api::line> subj;
@@ -35,11 +36,12 @@ struct simple_db::impl
   std::unique_ptr<web::http::compression::compress_provider> compressor;
 
   impl(std::string const& url, std::string const& org, std::string const& bucket,
-        const int duration_seconds, const int shard_duration_seconds,
-        const int window_max_lines, const int window_max_ms)
+       std::string const& token, const int duration_seconds, const int shard_duration_seconds,
+       const int window_max_lines, const int window_max_ms)
       : client(url),
         org(org),
         bucket(bucket),
+        token(token),
         started(false),
         duration_seconds(duration_seconds),
         shard_duration_seconds(shard_duration_seconds),
@@ -49,7 +51,7 @@ struct simple_db::impl
     throw_on_invalid_identifier(org);
     throw_on_invalid_identifier(bucket);
     uri_builder builder(client.base_uri());
-    builder.append(U("/write"));
+    builder.append(U("/api/v2/write"));
     builder.append_query(U("org"), org);
     builder.append_query(U("bucket"), bucket);
     uri_with_db = builder.to_uri();
@@ -90,9 +92,23 @@ struct simple_db::impl
                             http_request request;
                             request.set_request_uri(uri_with_db);
                             request.set_method(methods::POST);
+                            request.headers().add("Authorization", "Token " + token);
                             request.set_compressor(make_compressor(algorithm::GZIP));
                             request.set_body(w->str());
-                            client.request(request);
+                            auto response = client.request(request);
+                            try
+                            {
+                              response.wait();
+                              if (!(response.get().status_code() == status_codes::OK ||
+                                    response.get().status_code() == status_codes::NoContent))
+                              {
+                                throw std::runtime_error(response.get().extract_string().get());
+                              }
+                            }
+                            catch (const std::exception& e)
+                            {
+                              throw std::runtime_error(e.what());
+                            }
                           }
                           catch (const std::exception& e)
                           {
@@ -118,6 +134,7 @@ struct simple_db::impl
   web::json::value get_json(const web::uri& uri)
   {
     http_request req;
+    req.headers().add("Authorization", "Token " + token);
     req.set_request_uri(uri);
     auto response = client.request(req);
     try
@@ -139,44 +156,53 @@ struct simple_db::impl
     }
   }
 
-  std::string get_orgid(const std::string &org_name)
+  std::string get_orgid(const std::string& org_name)
   {
     uri_builder builder(U("/api/v2/orgs"));
     builder.append_query(U("org"), org_name);
-    return get_json(builder.to_uri())["id"].as_string();
+    auto orgid = get_json(builder.to_uri())["orgs"][0]["id"];
+    if (!orgid.is_string()) return "";
+    return orgid.as_string();
   }
 
-  web::json::object get_bucket(const std::string &orgid, const std::string &bucket_name)
+  web::json::object get_bucket(const std::string& orgid, const std::string& bucket_name)
   {
     uri_builder builder(U("/api/v2/buckets"));
     builder.append_query(U("orgID"), orgid);
     builder.append_query(U("name"), bucket_name);
-    auto buckets = get_json(builder.to_uri())["buckets"];
-    if (buckets.size()) {
-      return buckets[0].as_object();
+    try
+    {
+      auto buckets = get_json(builder.to_uri())["buckets"];
+      if (buckets.size())
+      {
+        return buckets[0].as_object();
+      }
+    }
+    catch (const std::runtime_error& e)
+    {
     }
     return web::json::value::object().as_object();
   }
 
-  void create_bucket(const std::string& orgid)
+  void create_bucket(const std::string& orgid, const std::string& bucket_name)
   {
     uri_builder builder(U("/api/v2/buckets"));
     auto json_body = web::json::value::object(
-        {std::make_pair("name", web::json::value::string(org)),
+        {std::make_pair("name", web::json::value::string(bucket)),
          std::make_pair("orgID", web::json::value::string(orgid)),
          std::make_pair("retentionRules",
                         web::json::value::array({web::json::value::object({
                             std::make_pair("everySeconds", web::json::value::number(0)),
                             std::make_pair("type", web::json::value::string("expire")),
                         })}))});
-
     http_request req;
     req.set_request_uri(builder.to_uri());
     req.set_method(methods::POST);
+    req.headers().add("Authorization", "Token " + token);
     req.set_body(json_body);
     auto response = client.request(req);
     response.wait();
-    if (response.get().status_code() != status_codes::OK)
+    if (response.get().status_code() != status_codes::Created)
     {
       throw std::runtime_error(response.get().extract_string().get());
     }
@@ -190,15 +216,17 @@ struct simple_db::impl
 };
 
 simple_db::simple_db(std::string const& url, std::string const& org, std::string const& bucket)
-    : simple_db(url, org, bucket, 0, 0, 50000, 100)
+    : simple_db(url, org, bucket, "", 0, 0, 50000, 100)
 {
 }
 
 simple_db::simple_db(std::string const& url, std::string const& org, std::string const& bucket,
-                     const int duration_seconds, const int shard_duration_seconds,
-                     const int window_max_lines, const int window_max_ms)
-    : pimpl(std::make_unique<impl>(url, org, bucket, duration_seconds, shard_duration_seconds, window_max_lines, window_max_ms)),
-      influxdb::async_api::simple_db(url, bucket, window_max_lines, window_max_ms)
+                     std::string const& token, const int duration_seconds,
+                     const int shard_duration_seconds, const int window_max_lines,
+                     const int window_max_ms)
+    : influxdb::async_api::simple_db(url, bucket, window_max_lines, window_max_ms),
+      pimpl(std::make_unique<impl>(url, org, bucket, token, duration_seconds,
+                                   shard_duration_seconds, window_max_lines, window_max_ms))
 {
 }
 
@@ -207,19 +235,28 @@ simple_db::~simple_db() { pimpl->started = false; }
 void simple_db::create()
 {
   const std::string orgid = pimpl->get_orgid(pimpl->org);
+  std::cout << orgid << std::endl;
   auto bucket_obj = pimpl->get_bucket(orgid, pimpl->bucket);
-  if (bucket_obj.empty()) {
+  if (bucket_obj.empty())
+  {
     // bucket not found
-    pimpl->create_bucket(orgid);
-  } else {
+    pimpl->create_bucket(orgid, pimpl->bucket);
+  }
+  else
+  {
     int duration = bucket_obj["retentionRules"][0]["everySeconds"].as_number().to_int64();
     int shard_duration = 0;
-    if (bucket_obj["retentionRules"][0].has_field("shardGroupDurationSeconds")) {
-      shard_duration = bucket_obj["retentionRules"][0]["shardGroupDurationSeconds"].as_number().to_int64();
+    if (bucket_obj["retentionRules"][0].has_field("shardGroupDurationSeconds"))
+    {
+      shard_duration =
+          bucket_obj["retentionRules"][0]["shardGroupDurationSeconds"].as_number().to_int64();
     }
 
-    if (duration != pimpl->duration_seconds || shard_duration != pimpl->shard_duration_seconds ) {
-      throw std::runtime_error(std::string("retention rule mismatch"));
+    if (duration != pimpl->duration_seconds || shard_duration != pimpl->shard_duration_seconds)
+    {
+      std::ostringstream oss;
+      oss << "retention rule mismatch: (" << duration << ", " << shard_duration << ")";
+      throw std::runtime_error(oss.str());
     }
   }
 }
