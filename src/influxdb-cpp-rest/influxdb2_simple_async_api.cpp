@@ -195,11 +195,14 @@ struct simple_db::impl
     auto json_body = web::json::value::object(
         {std::make_pair("name", web::json::value::string(bucket)),
          std::make_pair("orgID", web::json::value::string(orgid)),
-         std::make_pair("retentionRules",
-                        web::json::value::array({web::json::value::object({
-                            std::make_pair("everySeconds", web::json::value::number(0)),
-                            std::make_pair("type", web::json::value::string("expire")),
-                        })}))});
+         std::make_pair(
+             "retentionRules",
+             web::json::value::array({web::json::value::object({
+                 std::make_pair("everySeconds", web::json::value::number(duration_seconds)),
+                 std::make_pair("shardGroupDurationSeconds",
+                                web::json::value::number(shard_duration_seconds)),
+                 std::make_pair("type", web::json::value::string("expire")),
+             })}))});
     http_request req;
     req.set_request_uri(builder.to_uri());
     req.set_method(methods::POST);
