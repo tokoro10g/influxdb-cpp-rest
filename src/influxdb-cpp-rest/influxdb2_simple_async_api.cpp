@@ -161,8 +161,11 @@ struct simple_db::impl
   {
     uri_builder builder(U("/api/v2/orgs"));
     builder.append_query(U("org"), org_name);
-    auto orgid = get_json(builder.to_uri())["orgs"][0]["id"];
-    if (!orgid.is_string()) return "";
+    const auto orgid = get_json(builder.to_uri())["orgs"][0]["id"];
+    if (!orgid.is_string())
+    {
+      return "";
+    }
     return orgid.as_string();
   }
 
@@ -181,6 +184,7 @@ struct simple_db::impl
     }
     catch (const std::runtime_error& e)
     {
+      // ignore
     }
     return web::json::value::object().as_object();
   }
@@ -245,7 +249,7 @@ void simple_db::create()
   else
   {
     pimpl->bucketid = bucket_obj["id"].as_string();
-    int duration = bucket_obj["retentionRules"][0]["everySeconds"].as_number().to_int64();
+    const int duration = bucket_obj["retentionRules"][0]["everySeconds"].as_number().to_int64();
     int shard_duration = 0;
     if (bucket_obj["retentionRules"][0].has_field("shardGroupDurationSeconds"))
     {

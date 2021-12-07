@@ -30,6 +30,7 @@ namespace async_api
 {
 class simple_db : public influxdb::async_api::simple_db
 {
+ private:
   struct impl;
   std::unique_ptr<impl> pimpl;
 
@@ -40,7 +41,6 @@ class simple_db : public influxdb::async_api::simple_db
             const int window_max_lines, const int window_max_ms);
   ~simple_db();
 
- public:
   void create();
   void insert(influxdb::api::line const& lines);
   std::string get_orgid() const;
