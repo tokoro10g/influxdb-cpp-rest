@@ -35,7 +35,6 @@ struct simple_db::impl
   const int shard_duration_seconds;
   const int window_max_lines;
   const std::chrono::milliseconds window_max_ms;
-  std::unique_ptr<web::http::compression::compress_provider> compressor;
 
   impl(std::string const& url, std::string const& org, std::string const& bucket,
        std::string const& token, const int duration_seconds, const int shard_duration_seconds,
