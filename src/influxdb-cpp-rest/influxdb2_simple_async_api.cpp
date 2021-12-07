@@ -24,7 +24,9 @@ struct simple_db::impl
   http_client client;
   uri uri_with_db;
   std::string org;
+  std::string orgid;
   std::string bucket;
+  std::string bucketid;
   std::string token;
   std::atomic<bool> started;
   rxcpp::subscription listener;
@@ -234,16 +236,16 @@ simple_db::~simple_db() { pimpl->started = false; }
 
 void simple_db::create()
 {
-  const std::string orgid = pimpl->get_orgid(pimpl->org);
-  std::cout << orgid << std::endl;
-  auto bucket_obj = pimpl->get_bucket(orgid, pimpl->bucket);
+  pimpl->orgid = pimpl->get_orgid(pimpl->org);
+  auto bucket_obj = pimpl->get_bucket(pimpl->orgid, pimpl->bucket);
   if (bucket_obj.empty())
   {
     // bucket not found
-    pimpl->create_bucket(orgid, pimpl->bucket);
+    pimpl->create_bucket(pimpl->orgid, pimpl->bucket);
   }
   else
   {
+    pimpl->bucketid = bucket_obj["id"].as_string();
     int duration = bucket_obj["retentionRules"][0]["everySeconds"].as_number().to_int64();
     int shard_duration = 0;
     if (bucket_obj["retentionRules"][0].has_field("shardGroupDurationSeconds"))
@@ -256,7 +258,7 @@ void simple_db::create()
     {
       std::ostringstream oss;
       oss << "retention rule mismatch: (" << duration << ", " << shard_duration << ")";
-      throw std::runtime_error(oss.str());
+      throw influxdb2::retention_rule_error(oss.str().c_str());
     }
   }
 }
@@ -272,6 +274,9 @@ void simple_db::insert(influxdb::api::line const& lines)
 
   subscriber.on_next(lines);
 }
+
+std::string simple_db::get_orgid() const { return pimpl->orgid; }
+std::string simple_db::get_bucketid() const { return pimpl->bucketid; }
 
 }  // namespace async_api
 }  // namespace influxdb2

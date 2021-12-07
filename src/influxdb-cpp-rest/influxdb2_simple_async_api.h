@@ -20,6 +20,12 @@ class line;
 
 namespace influxdb2
 {
+class retention_rule_error : public std::runtime_error
+{
+ public:
+  retention_rule_error(const char* message) : runtime_error(message) {}
+};
+
 namespace async_api
 {
 class simple_db : public influxdb::async_api::simple_db
@@ -30,14 +36,15 @@ class simple_db : public influxdb::async_api::simple_db
  public:
   simple_db(std::string const& url, std::string const& org, std::string const& bucket);
   simple_db(std::string const& url, std::string const& org, std::string const& bucket,
-            std::string const& token,
-            const int duration_seconds, const int shard_duration_seconds,
+            std::string const& token, const int duration_seconds, const int shard_duration_seconds,
             const int window_max_lines, const int window_max_ms);
   ~simple_db();
 
  public:
   void create();
   void insert(influxdb::api::line const& lines);
+  std::string get_orgid() const;
+  std::string get_bucketid() const;
 };
 }  // namespace async_api
 
