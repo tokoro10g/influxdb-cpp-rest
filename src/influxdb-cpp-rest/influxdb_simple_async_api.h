@@ -22,12 +22,12 @@ namespace influxdb {
         public:
             simple_db(std::string const& url, std::string const& name);
             simple_db(std::string const& url, std::string const& name, unsigned window_max_lines, unsigned window_max_ms);
-            ~simple_db();
+            virtual ~simple_db();
 
         public:
-            void create();
+            virtual void create();
             void drop();
-            void insert(influxdb::api::line const& lines);
+            virtual void insert(influxdb::api::line const& lines);
             void with_authentication(std::string const& username, std::string const& password);
             void with_retention_policy(std::string const& retention_policy);
         };
