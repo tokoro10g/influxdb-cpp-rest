@@ -4,6 +4,7 @@
 
 #include <cpprest/http_client.h>
 #include <cpprest/json.h>
+#include <cpprest/rawptrstream.h>
 #include <fmt/ostream.h>
 #include <rx.hpp>
 #include <atomic>
@@ -90,25 +91,44 @@ struct simple_db::impl
                         {
                           try
                           {
-                            http_request request;
-                            request.set_request_uri(uri_with_db);
-                            request.set_method(methods::POST);
-                            request.headers().add("Authorization", "Token " + token);
-                            request.set_compressor(make_compressor(algorithm::GZIP));
-                            request.set_body(w->str());
-                            auto response = client.request(request);
-                            try
+                            std::vector<concurrency::streams::istream> streams;
+                            auto c = make_compressor(algorithm::GZIP);
+                            std::vector<uint8_t> pre;
+                            pre.resize(w->size());
+                            size_t used;
+                            bool done = false;
+                            auto got = c->compress(reinterpret_cast<const uint8_t*>(w->data()),
+                                                   w->size(), pre.data(), pre.size(),
+                                                   web::http::compression::operation_hint::is_last,
+                                                   used, done);
+                            streams.emplace_back(
+                                concurrency::streams::rawptr_stream<uint8_t>::open_istream(
+                                    pre.data(), got));
+
+                            for (auto& stream : streams)
                             {
-                              response.wait();
-                              if (!(response.get().status_code() == status_codes::OK ||
-                                    response.get().status_code() == status_codes::NoContent))
+                              http_request request;
+                              request.set_request_uri(uri_with_db);
+                              request.set_method(methods::POST);
+                              request.headers().add("Authorization", "Token " + token);
+                              request.headers().add(header_names::content_encoding,
+                                                    algorithm::GZIP);
+
+                              request.set_body(stream);
+                              auto response = client.request(request);
+                              try
                               {
-                                throw std::runtime_error(response.get().extract_string().get());
+                                response.wait();
+                                if (!(response.get().status_code() == status_codes::OK ||
+                                      response.get().status_code() == status_codes::NoContent))
+                                {
+                                  throw std::runtime_error(response.get().extract_string().get());
+                                }
                               }
-                            }
-                            catch (const std::exception& e)
-                            {
-                              throw std::runtime_error(e.what());
+                              catch (const std::exception& e)
+                              {
+                                throw std::runtime_error(e.what());
+                              }
                             }
                           }
                           catch (const std::exception& e)
