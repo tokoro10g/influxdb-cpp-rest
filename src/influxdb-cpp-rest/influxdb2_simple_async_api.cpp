@@ -93,17 +93,29 @@ struct simple_db::impl
                           {
                             std::vector<concurrency::streams::istream> streams;
                             auto c = make_compressor(algorithm::GZIP);
+
+                            bool done = false;
+                            size_t processed = 0;
+                            size_t csize = 0;
                             std::vector<uint8_t> pre;
                             pre.resize(w->size());
-                            size_t used;
-                            bool done = false;
-                            auto got = c->compress(reinterpret_cast<const uint8_t*>(w->data()),
-                                                   w->size(), pre.data(), pre.size(),
-                                                   web::http::compression::operation_hint::is_last,
-                                                   used, done);
+                            while (!done)
+                            {
+                              size_t used = 0;
+                              if (csize == pre.size())
+                              {
+                                pre.resize(csize * 2);
+                              }
+                              auto got = c->compress(
+                                  reinterpret_cast<const uint8_t*>(w->data()) + processed,
+                                  w->size() - processed, pre.data() + csize, pre.size() - csize,
+                                  web::http::compression::operation_hint::is_last, used, done);
+                              csize += got;
+                              processed += used;
+                            }
                             streams.emplace_back(
                                 concurrency::streams::rawptr_stream<uint8_t>::open_istream(
-                                    pre.data(), got));
+                                    pre.data(), csize));
 
                             for (auto& stream : streams)
                             {
