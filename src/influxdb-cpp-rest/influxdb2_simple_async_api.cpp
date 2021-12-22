@@ -91,44 +91,65 @@ struct simple_db::impl
                         {
                           try
                           {
-                            std::vector<concurrency::streams::istream> streams;
                             auto c = make_compressor(algorithm::GZIP);
-                            std::vector<uint8_t> pre;
-                            pre.resize(w->size());
-                            size_t used;
+
+                            const int rawdata_size = w->size();
+                            const uint8_t* rawdata_ptr =
+                                reinterpret_cast<const uint8_t*>(w->data());
+                            int rawdata_cursor = 0;
+
+                            std::vector<uint8_t> compression_buffer;
+                            int compressed_size = 0;
                             bool done = false;
-                            auto got = c->compress(reinterpret_cast<const uint8_t*>(w->data()),
-                                                   w->size(), pre.data(), pre.size(),
-                                                   web::http::compression::operation_hint::is_last,
-                                                   used, done);
-                            streams.emplace_back(
-                                concurrency::streams::rawptr_stream<uint8_t>::open_istream(
-                                    pre.data(), got));
 
-                            for (auto& stream : streams)
+                            compression_buffer.resize(rawdata_size);
+                            while (!done)
                             {
-                              http_request request;
-                              request.set_request_uri(uri_with_db);
-                              request.set_method(methods::POST);
-                              request.headers().add("Authorization", "Token " + token);
-                              request.headers().add(header_names::content_encoding,
-                                                    algorithm::GZIP);
+                              size_t used = 0;
+                              if (compressed_size >= rawdata_size * 16)
+                              {
+                                throw std::runtime_error(
+                                    "gzip data is 16 times larger than raw data. abort "
+                                    "compression");
+                              }
+                              if (compressed_size == compression_buffer.size())
+                              {
+                                compression_buffer.resize(compressed_size * 2);
+                              }
+                              const int got = c->compress(
+                                  rawdata_ptr + rawdata_cursor,   // rawdata ptr
+                                  rawdata_size - rawdata_cursor,  // remaining rawdata size
+                                  compression_buffer.data() +
+                                      compressed_size,  // buffer ptr to append
+                                  compression_buffer.size() -
+                                      compressed_size,  // buffer available size
+                                  web::http::compression::operation_hint::is_last, used, done);
+                              compressed_size += got;
+                              rawdata_cursor += used;
+                            }
 
-                              request.set_body(stream);
-                              auto response = client.request(request);
-                              try
+                            http_request request;
+                            request.set_request_uri(uri_with_db);
+                            request.set_method(methods::POST);
+                            request.headers().add("Authorization", "Token " + token);
+                            request.headers().add(header_names::content_encoding, algorithm::GZIP);
+
+                            request.set_body(
+                                concurrency::streams::rawptr_stream<uint8_t>::open_istream(
+                                    compression_buffer.data(), compressed_size));
+                            auto response = client.request(request);
+                            try
+                            {
+                              response.wait();
+                              if (!(response.get().status_code() == status_codes::OK ||
+                                    response.get().status_code() == status_codes::NoContent))
                               {
-                                response.wait();
-                                if (!(response.get().status_code() == status_codes::OK ||
-                                      response.get().status_code() == status_codes::NoContent))
-                                {
-                                  throw std::runtime_error(response.get().extract_string().get());
-                                }
+                                throw std::runtime_error(response.get().extract_string().get());
                               }
-                              catch (const std::exception& e)
-                              {
-                                throw std::runtime_error(e.what());
-                              }
+                            }
+                            catch (const std::exception& e)
+                            {
+                              throw std::runtime_error(e.what());
                             }
                           }
                           catch (const std::exception& e)
