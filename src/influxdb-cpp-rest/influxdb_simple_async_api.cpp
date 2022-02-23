@@ -12,6 +12,7 @@
 #include "influxdb_simple_api.h"
 #include "input_sanitizer.h"
 #include "influxdb_line.h"
+#include "deflate.h"
 
 #include <rx.hpp>
 #include <chrono>
@@ -29,9 +30,9 @@ struct influxdb::async_api::simple_db::impl {
     unsigned window_max_lines;
     std::chrono::milliseconds window_max_ms;
 
-    impl(std::string const& url, std::string const& name, unsigned window_max_lines, unsigned window_max_ms) :
-        db(url, name),
-        simpledb(url, name),
+    impl(std::string const& url, std::string const& name, unsigned window_max_lines, unsigned window_max_ms, bool deflate) :
+        db(url, name, deflate),
+        simpledb(url, name, deflate),
         started(false),
         window_max_lines(window_max_lines),
         window_max_ms(window_max_ms)
@@ -68,7 +69,7 @@ struct influxdb::async_api::simple_db::impl {
                         .subscribe([this](std::shared_ptr<fmt::MemoryWriter> const& w) {
                             if (w->size() > 0u) {
                                 try {
-                                    db.insert_async(w->str());
+                                    db.insert_async(w);
                                 } catch (const std::runtime_error& e) {
                                     throw std::runtime_error(std::string("async_api::insert failed: ") + e.what() + " -> Dropping " + std::to_string(w->size()) + " bytes");
                                 }
@@ -92,12 +93,12 @@ struct influxdb::async_api::simple_db::impl {
 
 
 influxdb::async_api::simple_db::simple_db(std::string const& url, std::string const& name) :
-    simple_db(url, name, 50000, 100)
+    simple_db(url, name, 50000, 100, false)
 {
 }
 
-influxdb::async_api::simple_db::simple_db(std::string const & url, std::string const & name, unsigned window_max_lines, unsigned window_max_ms) :
-    pimpl(std::make_unique<impl>(url, name, window_max_lines, window_max_ms))
+influxdb::async_api::simple_db::simple_db(std::string const & url, std::string const & name, unsigned window_max_lines, unsigned window_max_ms, bool deflate) :
+    pimpl(std::make_unique<impl>(url, name, window_max_lines, window_max_ms, deflate))
 {
 }
 

@@ -7,9 +7,12 @@
 //
 
 #include "influxdb_raw_db.h"
+#include "deflate.h"
 
+#include <fmt/ostream.h>
 #include <cpprest/streams.h>
 #include <cpprest/http_client.h>
+#include <cpprest/rawptrstream.h>
 
 using namespace utility;
 using namespace web;
@@ -26,9 +29,10 @@ namespace {
 
     inline http_request request_from(
             uri const& uri_with_db,
-            std::string const& lines,
+            std::shared_ptr<fmt::MemoryWriter> lines,
             std::string const& username,
             std::string const& password,
+            bool deflate,
             std::string const& retention_policy = "",
             web::http::method const& m = methods::POST
     ) {
@@ -59,15 +63,22 @@ namespace {
             ;
         }
 
-        request.set_body(lines);
-
+        if (deflate) {
+            std::vector<uint8_t> buffer;
+            influxdb::utility::compress(lines, buffer);
+            request.set_body(concurrency::streams::rawptr_stream<uint8_t>::open_istream(
+                                    buffer.data(), buffer.size()));
+        } else {
+            request.set_body(lines->str());
+        }
+        
         return request;
     }
 }
 
-influxdb::raw::db::db(string_t const & url, string_t const & name)
+influxdb::raw::db::db(string_t const & url, string_t const & name, bool deflate)
     :
-    client(url)
+    client(url), deflate(deflate)
 {
     uri_builder builder(client.base_uri());
     builder.append(U("/write"));
@@ -81,9 +92,10 @@ void influxdb::raw::db::post(string_t const & query)
 
     builder.append_query(U("q"), query);
 
+    auto w = std::make_shared<fmt::MemoryWriter>();
     // synchronous for now
     auto response = client.request(
-        request_from(builder.to_string(), "", username, password, retention_policy)
+        request_from(builder.to_string(), w, username, password, deflate, retention_policy)
     );
 
     try {
@@ -101,10 +113,11 @@ string_t influxdb::raw::db::get(string_t const & query)
     uri_builder builder(U("/query"));
 
     builder.append_query(U("q"), query);
+    auto w = std::make_shared<fmt::MemoryWriter>();
 
     // synchronous for now
     auto response = client.request(
-        request_from(builder.to_string(), "", username, password, retention_policy)
+        request_from(builder.to_string(), w, username, password, deflate, retention_policy)
     );
 
     try {
@@ -123,9 +136,9 @@ string_t influxdb::raw::db::get(string_t const & query)
     }
 }
 
-void influxdb::raw::db::insert(std::string const & lines)
+void influxdb::raw::db::insert(std::shared_ptr<fmt::MemoryWriter> lines)
 {
-    auto response = client.request(request_from(uri_with_db, lines, username, password, retention_policy));
+    auto response = client.request(request_from(uri_with_db, lines, username, password, deflate, retention_policy));
 
     try {
         response.wait();
@@ -138,7 +151,7 @@ void influxdb::raw::db::insert(std::string const & lines)
 }
 
 // synchronous for now
-void influxdb::raw::db::insert_async(std::string const & lines)
+void influxdb::raw::db::insert_async(std::shared_ptr<fmt::MemoryWriter> lines)
 {
     insert(lines);
 }

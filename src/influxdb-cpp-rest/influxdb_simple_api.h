@@ -19,7 +19,7 @@ namespace influxdb {
             std::unique_ptr<impl> pimpl;
 
         public:
-            simple_db(std::string const& url, std::string const& name);
+            simple_db(std::string const& url, std::string const& name, bool deflate);
             ~simple_db();
 
         public:

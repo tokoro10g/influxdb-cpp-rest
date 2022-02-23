@@ -1,6 +1,7 @@
 #include "influxdb2_simple_async_api.h"
 #include "influxdb_line.h"
 #include "input_sanitizer.h"
+#include "deflate.h"
 
 #include <cpprest/http_client.h>
 #include <cpprest/json.h>
@@ -91,42 +92,8 @@ struct simple_db::impl
                         {
                           try
                           {
-                            auto c = make_compressor(algorithm::GZIP);
-
-                            const int rawdata_size = w->size();
-                            const uint8_t* rawdata_ptr =
-                                reinterpret_cast<const uint8_t*>(w->data());
-                            int rawdata_cursor = 0;
-
                             std::vector<uint8_t> compression_buffer;
-                            int compressed_size = 0;
-                            bool done = false;
-
-                            compression_buffer.resize(rawdata_size);
-                            while (!done)
-                            {
-                              size_t used = 0;
-                              if (compressed_size >= rawdata_size * 16)
-                              {
-                                throw std::runtime_error(
-                                    "gzip data is 16 times larger than raw data. abort "
-                                    "compression");
-                              }
-                              if (compressed_size == compression_buffer.size())
-                              {
-                                compression_buffer.resize(compressed_size * 2);
-                              }
-                              const int got = c->compress(
-                                  rawdata_ptr + rawdata_cursor,   // rawdata ptr
-                                  rawdata_size - rawdata_cursor,  // remaining rawdata size
-                                  compression_buffer.data() +
-                                      compressed_size,  // buffer ptr to append
-                                  compression_buffer.size() -
-                                      compressed_size,  // buffer available size
-                                  web::http::compression::operation_hint::is_last, used, done);
-                              compressed_size += got;
-                              rawdata_cursor += used;
-                            }
+                            compress(w, compression_buffer);
 
                             http_request request;
                             request.set_request_uri(uri_with_db);
@@ -136,7 +103,7 @@ struct simple_db::impl
 
                             request.set_body(
                                 concurrency::streams::rawptr_stream<uint8_t>::open_istream(
-                                    compression_buffer.data(), compressed_size));
+                                    compression_buffer.data(), compression_buffer.size()));
                             auto response = client.request(request);
                             try
                             {
@@ -304,7 +271,7 @@ simple_db::simple_db(std::string const& url, std::string const& org, std::string
                      std::string const& token, const int duration_seconds,
                      const int shard_duration_seconds, const int window_max_lines,
                      const int window_max_ms)
-    : influxdb::async_api::simple_db(url, bucket, window_max_lines, window_max_ms),
+    : influxdb::async_api::simple_db(url, bucket, window_max_lines, window_max_ms, true),
       pimpl(std::make_unique<impl>(url, org, bucket, token, duration_seconds,
                                    shard_duration_seconds, window_max_lines, window_max_ms))
 {
