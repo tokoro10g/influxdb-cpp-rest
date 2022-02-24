@@ -17,6 +17,7 @@
 using namespace utility;
 using namespace web;
 using namespace web::http;
+using namespace web::http::compression::builtin;
 
 namespace {
     inline void throw_response(http_response const& response) {
@@ -63,9 +64,10 @@ namespace {
             ;
         }
 
-        if (deflate) {
+        if (lines->size() > 0 && deflate) {
             std::vector<uint8_t> buffer;
             influxdb::utility::compress(lines, buffer);
+            request.headers().add(header_names::content_encoding, algorithm::GZIP);
             request.set_body(concurrency::streams::rawptr_stream<uint8_t>::open_istream(
                                     buffer.data(), buffer.size()));
         } else {

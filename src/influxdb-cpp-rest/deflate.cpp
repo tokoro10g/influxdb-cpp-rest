@@ -29,13 +29,13 @@ namespace influxdb {
                 size_t used = 0;
                 if (compressed_size >= rawdata_size * 16)
                 {
-                throw std::runtime_error(
-                    "gzip data is 16 times larger than raw data. abort "
-                    "compression");
+                    throw std::runtime_error(
+                        "gzip data is 16 times larger than raw data. abort "
+                        "compression");
                 }
                 if (compressed_size == compression_buffer.size())
                 {
-                compression_buffer.resize(compressed_size * 2);
+                    compression_buffer.resize(compressed_size * 2);
                 }
                 const int got = c->compress(
                     rawdata_ptr + rawdata_cursor,   // rawdata ptr
