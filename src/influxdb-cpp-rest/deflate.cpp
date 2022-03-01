@@ -13,7 +13,7 @@ using namespace web::http::compression::builtin;
 
 namespace influxdb {
     namespace utility {
-        void compress(std::shared_ptr<fmt::MemoryWriter> w, std::vector<uint8_t> &compression_buffer) {
+        int compress(std::shared_ptr<fmt::MemoryWriter> w, std::vector<uint8_t> &compression_buffer) {
             auto c = make_compressor(algorithm::GZIP);
             const int rawdata_size = w->size();
             const uint8_t* rawdata_ptr =
@@ -49,6 +49,7 @@ namespace influxdb {
                 rawdata_cursor += used;
             }
             compression_buffer.resize(compressed_size);
+            return compressed_size;
         }
     }
 }

@@ -30,7 +30,6 @@ namespace {
 
     inline http_request request_from(
             uri const& uri_with_db,
-            std::shared_ptr<fmt::MemoryWriter> lines,
             std::string const& username,
             std::string const& password,
             bool deflate,
@@ -63,16 +62,6 @@ namespace {
                 )
             ;
         }
-
-        if (lines->size() > 0 && deflate) {
-            std::vector<uint8_t> buffer;
-            influxdb::utility::compress(lines, buffer);
-            request.headers().add(header_names::content_encoding, algorithm::GZIP);
-            request.set_body(concurrency::streams::rawptr_stream<uint8_t>::open_istream(
-                                    buffer.data(), buffer.size()));
-        } else {
-            request.set_body(lines->str());
-        }
         
         return request;
     }
@@ -94,11 +83,10 @@ void influxdb::raw::db::post(string_t const & query)
 
     builder.append_query(U("q"), query);
 
-    auto w = std::make_shared<fmt::MemoryWriter>();
     // synchronous for now
-    auto response = client.request(
-        request_from(builder.to_string(), w, username, password, deflate, retention_policy)
-    );
+    auto request = request_from(builder.to_string(), username, password, deflate, retention_policy);
+    request.set_body("");
+    auto response = client.request(request);
 
     try {
         response.wait();
@@ -115,12 +103,11 @@ string_t influxdb::raw::db::get(string_t const & query)
     uri_builder builder(U("/query"));
 
     builder.append_query(U("q"), query);
-    auto w = std::make_shared<fmt::MemoryWriter>();
 
+    auto request = request_from(builder.to_string(), username, password, deflate, retention_policy);
+    request.set_body("");
     // synchronous for now
-    auto response = client.request(
-        request_from(builder.to_string(), w, username, password, deflate, retention_policy)
-    );
+    auto response = client.request(request);
 
     try {
         response.wait();
@@ -140,7 +127,17 @@ string_t influxdb::raw::db::get(string_t const & query)
 
 void influxdb::raw::db::insert(std::shared_ptr<fmt::MemoryWriter> lines)
 {
-    auto response = client.request(request_from(uri_with_db, lines, username, password, deflate, retention_policy));
+    auto request = request_from(uri_with_db, username, password, deflate, retention_policy);
+    std::vector<uint8_t> buffer; // needs to live until sending the request
+    if (lines->size() > 0 && deflate) {
+        int size = influxdb::utility::compress(lines, buffer);
+        request.headers().add(header_names::content_encoding, algorithm::GZIP);
+        request.set_body(concurrency::streams::rawptr_stream<uint8_t>::open_istream(
+                                buffer.data(), size));
+    } else {
+        request.set_body(lines->str());
+    }
+    auto response = client.request(request);
 
     try {
         response.wait();
