@@ -26,10 +26,10 @@ namespace influxdb {
             std::string get(std::string const& query);
 
             /// post measurements
-            void insert(std::shared_ptr<fmt::MemoryWriter> lines);
+            void insert(std::shared_ptr<fmt::MemoryWriter> const& lines);
 
             /// post measurements without waiting for an answer
-            void insert_async(std::shared_ptr<fmt::MemoryWriter> lines);
+            void insert_async(std::shared_ptr<fmt::MemoryWriter> const& lines);
 
             /// set username & password for basic authentication
             void with_authentication(std::string const& username, std::string const& password);

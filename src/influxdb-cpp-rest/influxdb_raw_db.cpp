@@ -125,7 +125,7 @@ string_t influxdb::raw::db::get(string_t const & query)
     }
 }
 
-void influxdb::raw::db::insert(std::shared_ptr<fmt::MemoryWriter> lines)
+void influxdb::raw::db::insert(std::shared_ptr<fmt::MemoryWriter> const& lines)
 {
     auto request = request_from(uri_with_db, username, password, deflate, retention_policy);
     std::vector<uint8_t> buffer; // needs to live until sending the request
@@ -150,7 +150,7 @@ void influxdb::raw::db::insert(std::shared_ptr<fmt::MemoryWriter> lines)
 }
 
 // synchronous for now
-void influxdb::raw::db::insert_async(std::shared_ptr<fmt::MemoryWriter> lines)
+void influxdb::raw::db::insert_async(std::shared_ptr<fmt::MemoryWriter> const& lines)
 {
     insert(lines);
 }
