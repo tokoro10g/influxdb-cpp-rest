@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cpprest/http_client.h>
+#include <fmt/ostream.h>
 #include <string>
 
 using utility::string_t;
@@ -21,9 +22,10 @@ namespace influxdb {
             std::string username;
             std::string password;
             std::string retention_policy;
+            bool deflate;
 
         public:
-            db(string_t const& url, string_t const& name);
+            db(string_t const& url, string_t const& name, bool deflate);
 
             /// post queries
             void post(string_t const& query);
@@ -32,10 +34,10 @@ namespace influxdb {
             string_t get(string_t const& query);
 
             /// post measurements
-            void insert(std::string const& lines);
+            void insert(std::shared_ptr<fmt::MemoryWriter> const& lines);
 
             /// post measurements and do not wait
-            void insert_async(std::string const& lines);
+            void insert_async(std::shared_ptr<fmt::MemoryWriter> const& lines);
 
             /// set username & password for basic authentication
             void with_authentication(std::string const& username, std::string const& password);

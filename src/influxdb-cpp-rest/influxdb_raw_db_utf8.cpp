@@ -17,18 +17,18 @@ struct influxdb::raw::db_utf8::impl {
     db db_utf16;
 
 public:
-    impl(std::string const& url,std::string const& name)
+    impl(std::string const& url,std::string const& name, bool deflate)
         :
 #ifndef _MSC_VER
-        db_utf16(url, name)
+        db_utf16(url, name, deflate)
 #else
-        db_utf16(conversions::utf8_to_utf16(url), conversions::utf8_to_utf16(name))
+        db_utf16(conversions::utf8_to_utf16(url), conversions::utf8_to_utf16(name), deflate)
 #endif
     {}
 };
 
-influxdb::raw::db_utf8::db_utf8(std::string const & url, std::string const& name) :
-    pimpl(std::make_unique<impl>(url, name))
+influxdb::raw::db_utf8::db_utf8(std::string const & url, std::string const& name, bool deflate) :
+    pimpl(std::make_unique<impl>(url, name, deflate))
 {
 }
 
@@ -56,11 +56,11 @@ std::string influxdb::raw::db_utf8::get(std::string const& query) {
 #endif
 }
 
-void influxdb::raw::db_utf8::insert(std::string const & lines) {
+void influxdb::raw::db_utf8::insert(std::shared_ptr<fmt::MemoryWriter> const& lines) {
     pimpl->db_utf16.insert(lines);
 }
 
-void influxdb::raw::db_utf8::insert_async(std::string const & lines)
+void influxdb::raw::db_utf8::insert_async(std::shared_ptr<fmt::MemoryWriter> const& lines)
 {
     pimpl->db_utf16.insert_async(lines);
 }

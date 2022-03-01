@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <fmt/ostream.h>
 #include <string>
 #include <memory>
 
@@ -15,7 +16,7 @@ namespace influxdb {
             std::unique_ptr<impl> pimpl;
 
         public:
-            db_utf8(std::string const& url, std::string const& name);
+            db_utf8(std::string const& url, std::string const& name, bool deflate);
             ~db_utf8();
 
             /// post queries
@@ -25,10 +26,10 @@ namespace influxdb {
             std::string get(std::string const& query);
 
             /// post measurements
-            void insert(std::string const& lines);
+            void insert(std::shared_ptr<fmt::MemoryWriter> const& lines);
 
             /// post measurements without waiting for an answer
-            void insert_async(std::string const& lines);
+            void insert_async(std::shared_ptr<fmt::MemoryWriter> const& lines);
 
             /// set username & password for basic authentication
             void with_authentication(std::string const& username, std::string const& password);

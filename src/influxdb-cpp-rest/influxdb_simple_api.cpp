@@ -17,16 +17,16 @@ struct influxdb::api::simple_db::impl {
     std::string name;
     influxdb::raw::db_utf8 db;
 
-    impl(std::string const& url, std::string const& name) :
-        db(url, name),
+    impl(std::string const& url, std::string const& name, bool deflate) :
+        db(url, name, deflate),
         name(name)
     {
         throw_on_invalid_identifier(name);
     }
 };
 
-influxdb::api::simple_db::simple_db(std::string const& url, std::string const& name) :
-    pimpl(std::make_unique<impl>(url, name))
+influxdb::api::simple_db::simple_db(std::string const& url, std::string const& name, bool deflate) :
+    pimpl(std::make_unique<impl>(url, name, deflate))
 {
 }
 
@@ -46,7 +46,9 @@ void influxdb::api::simple_db::drop()
 
 void influxdb::api::simple_db::insert(line const & lines)
 {
-    pimpl->db.insert(lines.get());
+    auto w = std::make_shared<fmt::MemoryWriter>();
+    *w << lines.get();
+    pimpl->db.insert(w);
 }
 
 void influxdb::api::simple_db::with_authentication(std::string const& username, std::string const& password)
