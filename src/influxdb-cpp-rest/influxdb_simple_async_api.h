@@ -21,7 +21,7 @@ namespace influxdb {
 
         public:
             simple_db(std::string const& url, std::string const& name);
-            simple_db(std::string const& url, std::string const& name, unsigned window_max_lines, unsigned window_max_ms, bool deflate);
+            simple_db(std::string const& url, std::string const& name, unsigned window_max_lines, unsigned window_max_ms, bool deflate = false);
             virtual ~simple_db();
 
         public:

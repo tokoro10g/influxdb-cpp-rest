@@ -16,7 +16,7 @@ namespace influxdb {
             std::unique_ptr<impl> pimpl;
 
         public:
-            db_utf8(std::string const& url, std::string const& name, bool deflate);
+            db_utf8(std::string const& url, std::string const& name, bool deflate = false);
             ~db_utf8();
 
             /// post queries
