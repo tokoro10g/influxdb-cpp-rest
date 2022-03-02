@@ -25,7 +25,7 @@ namespace influxdb {
             bool deflate;
 
         public:
-            db(string_t const& url, string_t const& name, bool deflate);
+            db(string_t const& url, string_t const& name, bool deflate = false);
 
             /// post queries
             void post(string_t const& query);
