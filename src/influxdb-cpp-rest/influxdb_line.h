@@ -61,6 +61,16 @@ namespace influxdb {
                 return *this;
             }
 
+            key_value_pairs& add(std::string const& key, const uint64_t value) {
+                ::influxdb::utility::throw_on_invalid_identifier(key);
+
+                add_comma_if_necessary();
+
+                res << key << "=" << value << "u";
+
+                return *this;
+            }
+
             template<
                 class V,
                 typename std::enable_if<
@@ -97,6 +107,14 @@ namespace influxdb {
                 add_comma_if_necessary();
 
                 res << key << "=" << value << "i";
+
+                return *this;
+            }
+
+            key_value_pairs& add_unsafe(std::string const& key, const uint64_t value) {
+                add_comma_if_necessary();
+
+                res << key << "=" << value << "u";
 
                 return *this;
             }
